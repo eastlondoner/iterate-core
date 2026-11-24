@@ -177,7 +177,7 @@ test("`request-started` holds `$file:<path>:<sha256>` where the base64 was, and 
     const marker = (file) => `$file:${file.reference.path}:${file.sha}`;
     assert.ok(stored.includes(marker(png)), shape);
     // the stored body is the real body with the marker in place of each file's base64
-    const body = agent.calls[0].body;
+    const body = agent.calls[0].rawBody;
     const payload = fact.payload;
     const rebuilt = { ...payload.bodyWithoutInput, [payload.inputField]: payload.inputItemsAdded };
     let real = JSON.stringify(rebuilt).replaceAll(marker(png), png.base64);

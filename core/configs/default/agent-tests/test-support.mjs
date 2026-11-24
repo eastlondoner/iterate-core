@@ -82,7 +82,7 @@ export function agentOnALog(options) {
       ai: {
         run: async (model, body, runOptions) => {
           if (!alive()) return never;
-          const call = { model, body, options: runOptions };
+          const call = { model, body: promptAsInstructions(model, body), rawBody: body, options: runOptions };
           calls.push(call);
           return options.model(call, calls);
         },
@@ -300,6 +300,16 @@ export function agentOnALog(options) {
           false,
       ),
   };
+}
+
+/** AN OPENAI BODY AS THE TESTS READ IT: the prompt, which goes as the first input item (a
+ *  `developer` message, so that a ChatGPT plan token's cache reads it), back in `instructions`.
+ *  `rawBody` is the body as it was sent. */
+export function promptAsInstructions(model, body) {
+  if (!model.startsWith("openai/") || !Array.isArray(body?.input)) return body;
+  const [first, ...rest] = body.input;
+  if (first?.role !== "developer" || body.instructions !== undefined) return body;
+  return { instructions: first.content, ...body, input: rest };
 }
 
 // ── fake provider answers ──

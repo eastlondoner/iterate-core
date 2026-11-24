@@ -92,8 +92,12 @@ export function openaiResponses(host: OpenaiResponsesHost = {}): LlmApi {
           ownItemsOf(item, model) ?? (item.text ? [{ role: "assistant", content: item.text }] : [])
         );
       });
+      // THE PROMPT IS THE FIRST INPUT ITEM, not `instructions`: with a ChatGPT plan token a request
+      // that grows on the one before reads no cached prefix while the prompt is in `instructions`
+      // (measured 24 November 2026), and an API key caches either way. The platform's own runtime
+      // sends it the same way (core/lib/src/agents/render.ts).
+      if (instructions) input.unshift({ role: "developer", content: instructions });
       const bodyWithoutInput = {
-        instructions,
         stream: true,
         // nothing is kept on OpenAI's side: the log is the memory, and the encrypted reasoning
         // comes back in the output items for the next request

@@ -518,6 +518,10 @@ test("one exchange: the request, its exact bytes, the frames, the settlement, th
   // no tool: the instructions teach the one `<codemode>` block
   assert.equal(call.body.tools, undefined);
   assert.match(call.body.instructions, /YOUR RESPONSE IS ONE SCRIPT AND NOTHING ELSE/);
+  // as sent, the prompt is the first input item, not `instructions`: a ChatGPT plan token reads a
+  // cached prefix of a growing conversation only then
+  assert.equal(call.rawBody.instructions, undefined);
+  assert.deepEqual(call.rawBody.input[0], { role: "developer", content: call.body.instructions });
   assert.deepEqual(call.options, {
     returnRawResponse: true,
     gateway: {
@@ -564,7 +568,7 @@ test("one exchange: the request, its exact bytes, the frames, the settlement, th
     ...sent.payload?.bodyWithoutInput,
     [String(sent.payload?.inputField)]: sent.payload?.inputItemsAdded,
   };
-  assert.deepEqual(rebuilt, call.body);
+  assert.deepEqual(rebuilt, call.rawBody);
   assert.equal(sent.payload?.bodySha256, sha256(JSON.stringify(rebuilt)));
   assert.equal(sent.payload?.transport, "gateway");
   assert.equal(sent.payload?.extendsRequestStartedOffset, null);
@@ -1422,7 +1426,8 @@ test("the WebSocket: dialled once, kept between requests, OpenAI's own frames, n
   // the second request's fact repeats nothing: it extends the first (then the answer, its result
   // and the new words)
   assert.equal(second.payload?.extendsRequestStartedOffset, first.offset);
-  assert.equal(second.payload?.inputItemCountBefore, 1);
+  // the prompt and the first words
+  assert.equal(second.payload?.inputItemCountBefore, 2);
   assert.equal(second.payload.inputItemsAdded.length, 3);
   // the socket's own fact: dialled once for two requests (the test's clock stands still)
   assert.deepEqual(
