@@ -1180,6 +1180,37 @@ test("a server in a basement: one config fact, and its Chat Completions are aske
   assert.deepEqual(agent.invalidFacts(), []);
 });
 
+test("a stream with no content-type: OpenAI's answer to a ChatGPT plan token is read as server-sent events", async () => {
+  const agent = agentOnALog({
+    config: {
+      llmProviders: {
+        openai: {
+          api: "openai-responses",
+          baseUrl: "https://api.openai.com/v1",
+          headers: { authorization: 'Bearer getSecret("/secrets/chatgpt", { field: "accessToken" })' },
+        },
+      },
+    },
+    model: () => assert.fail("the gateway is not used"),
+    // as OpenAI sends it for a plan token: `event:` and `data:` lines, and no content-type
+    fetch: async () => {
+      const events = openaiEvents({ say: "Hello from the plan." });
+      const body = events
+        .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+        .join("");
+      const answer = new Response(body);
+      answer.headers.delete("content-type");
+      return answer;
+    },
+  });
+  await agent.say("hello");
+  const [sent] = agent.durable("events.iterate.com/llm-request/attempt-started");
+  assert.equal(sent.payload?.transport, "direct");
+  const [words] = agent.durable("events.iterate.com/agent-ui/message-sent");
+  assert.equal(words.payload?.message, "Hello from the plan.");
+  assert.deepEqual(agent.invalidFacts(), []);
+});
+
 test("an AI binding by expression: one config fact, and the requests go through its `run`, not `itx.ai`", async () => {
   const lent = [];
   const agent = agentOnALog({

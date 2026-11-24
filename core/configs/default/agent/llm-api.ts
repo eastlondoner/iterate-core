@@ -1306,12 +1306,19 @@ async function* httpEvents(
   const reader = response.body?.getReader();
   if (!reader) throw new LlmRequestFailure("transport", "the answer has no body");
   const decoder = new TextDecoder();
-  const eventStream = response.headers.get("content-type")?.includes("text/event-stream");
+  const contentType = response.headers.get("content-type");
+  // OpenAI sends a ChatGPT plan token's stream with no content-type (measured 24 November 2026):
+  // then the first bytes say whether it is server-sent events.
+  let eventStream = contentType ? contentType.includes("text/event-stream") : undefined;
   let buffered = "";
   try {
     for (;;) {
       const { value, done } = await unlessIdleOrAborted(reader.read(), idleMs, signal);
       buffered += decoder.decode(value, { stream: !done });
+      if (eventStream === undefined) {
+        if (!buffered.trim() && !done) continue;
+        eventStream = /^\s*(?:event|data|id|retry):/.test(buffered);
+      }
       if (!eventStream && !done) continue; // one JSON body: read it whole
       const lines = eventStream ? buffered.split("\n") : [];
       if (eventStream) buffered = done ? "" : (lines.pop() ?? "");
